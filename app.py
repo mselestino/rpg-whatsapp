@@ -14,6 +14,7 @@ def webhook():
     response = MessagingResponse()
     msg = response.message()
 
+    # Resposta padrão
     if incoming_msg == 'olá':
         msg.body('Olá! Bem-vindo ao RPG. O que você deseja fazer?')
     else:
@@ -22,4 +23,4 @@ def webhook():
     return str(response)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
