@@ -1,24 +1,25 @@
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
+import os
 
 app = Flask(__name__)
 
-@app.route("/webhook", methods=['POST'])
+@app.route('/webhook', methods=['POST'])
 def webhook():
-    msg = request.form.get('Body').lower()  # Obtém a mensagem do WhatsApp
-    resp = MessagingResponse()
+    # Pega a mensagem enviada
+    incoming_msg = request.form.get('Body', '').lower()
+    sender = request.form.get('From')
 
-    # Lógica do RPG
-    if "iniciar" in msg:
-        resp.message("Você está em uma floresta escura. Para seguir em frente, digite 'ir'.")
-    elif "ir" in msg:
-        resp.message("Você encontra um monstro! Escolha: 'atacar' ou 'fugir'.")
-    elif "atacar" in msg:
-        resp.message("Você atacou o monstro e venceu! Parabéns!")
+    # Cria a resposta
+    response = MessagingResponse()
+    msg = response.message()
+
+    if incoming_msg == 'olá':
+        msg.body('Olá! Bem-vindo ao RPG. O que você deseja fazer?')
     else:
-        resp.message("Escolha uma opção válida: 'iniciar', 'ir', 'atacar'.")
-    
-    return str(resp)
+        msg.body('Desculpe, não entendi. Tente novamente.')
 
-if __name__ == "__main__":
+    return str(response)
+
+if __name__ == '__main__':
     app.run(debug=True)
