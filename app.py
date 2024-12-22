@@ -1,31 +1,54 @@
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
+from database import adicionar_personagem
+from models import get_habilidades_raca, get_habilidades_classe
 
-# Inicializando o Flask
 app = Flask(__name__)
 
-# Rota do Webhook que o Twilio chamará para receber mensagens
+# Armazenamento de dados temporários por jogador
+game_data = {}
+
 @app.route("/webhook", methods=['POST'])
 def webhook():
-    msg = request.form.get('Body')  # Pega o texto da mensagem enviada pelo usuário
-    
-    # Criação da resposta para o Twilio
-    resposta = MessagingResponse()
+    msg = request.form.get('Body')
+    player_number = request.form.get('From')
+    resp = MessagingResponse()
 
-    # Lógica de resposta para o RPG
-    if msg.strip() == '1':  # Verifica se a resposta foi '1' para começar
-        resposta.message("Você começa sua jornada na floresta. Digite 'avançar' para continuar.")
-    elif msg.strip().lower() == 'avançar':  # Verifica se a resposta foi 'avançar'
-        resposta.message("Você avançou mais na floresta e encontrou um monstro! Digite 'atacar' ou 'fugir'.")
-    elif msg.strip().lower() == 'atacar':  # Se o jogador escolher 'atacar'
-        resposta.message("Você derrotou o monstro! Parabéns, você venceu!")
-    elif msg.strip().lower() == 'fugir':  # Se o jogador escolher 'fugir'
-        resposta.message("Você fugiu do monstro, mas ficou perdido na floresta...")
-    else:
-        resposta.message("Digite '1' para começar ou 'avançar' para continuar.")
-    
-    return str(resposta)
+    # Caso o jogador queira criar o personagem
+    if msg.lower() == "criar personagem":
+        resp.message("Bem-vindo ao RPG Empresarial! Primeiro, qual é o seu nome?")
+        game_data[player_number] = {'step': 'nome'}
+        return str(resp)
 
-# Configuração para rodar o Flask na porta 5000
+    # Caso o jogador tenha respondido o nome
+    if 'nome' in game_data.get(player_number, {}):
+        nome = msg
+        game_data[player_number]['nome'] = nome
+        resp.message(f"Olá, {nome}! Agora, escolha sua raça: \n1. Executivo\n2. Analítico\n3. Técnico")
+        game_data[player_number]['step'] = 'raca'
+        return str(resp)
+
+    # Caso o jogador tenha respondido a raça
+    if 'raca' in game_data.get(player_number, {}):
+        raca = msg
+        habilidades = get_habilidades_raca(raca)
+        game_data[player_number]['raca'] = raca
+        game_data[player_number]['habilidades'] = habilidades
+        resp.message(f"Você escolheu a raça {raca}. Agora, escolha sua classe: \n1. Gerente de Vendas\n2. Analista de Mercado")
+        game_data[player_number]['step'] = 'classe'
+        return str(resp)
+
+    # Caso o jogador tenha respondido a classe
+    if 'classe' in game_data.get(player_number, {}):
+        classe = msg
+        game_data[player_number]['classe'] = classe
+        # Adiciona o personagem no banco de dados
+        adicionar_personagem(game_data[player_number]['nome'], game_data[player_number]['raca'], classe, game_data[player_number]['habilidades'])
+        resp.message(f"Parabéns, {game_data[player_number]['nome']}! Você foi registrado como {classe} e sua raça é {raca}. Boa sorte em sua jornada empresarial!")
+        game_data.pop(player_number)  # Limpa os dados do jogador após a criação
+        return str(resp)
+
+    return str(resp)
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(debug=True)
