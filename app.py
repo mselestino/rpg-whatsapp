@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 from database import adicionar_personagem
@@ -51,4 +52,6 @@ def webhook():
     return str(resp)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Usar a variável de ambiente PORT fornecida pelo Render ou 5000 como fallback
+    port = os.environ.get("PORT", 5000)
+    app.run(host="0.0.0.0", port=port)
