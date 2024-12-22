@@ -1,2 +1,2 @@
-Flask==2.3.2
-twilio==7.10.0
+Flask
+twilio
