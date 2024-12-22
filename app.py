@@ -3,6 +3,9 @@ from twilio.twiml.messaging_response import MessagingResponse
 
 app = Flask(__name__)
 
+# Dicionário para armazenar o estado dos jogadores
+players = {}
+
 # Distribuição de habilidades para raças
 racas = {
     "Executivo": {"Força": 4, "Destreza": 5, "Inteligência": 8, "Fúria": 3, "Carisma": 9, "Disciplina": 7, "Constituição": 4, "Agilidade": 6, "Sorte": 5},
@@ -27,47 +30,61 @@ classes = {
 def webhook():
     incoming_msg = request.form.get('Body', '').strip().lower()
     sender = request.form.get('From')
-
+    
+    # Verifica se o jogador já está registrado
+    if sender not in players:
+        players[sender] = {'step': 'name'}  # Inicia o processo com o nome do jogador
+    
     # Criação da resposta
     response = MessagingResponse()
     msg = response.message()
 
-    # Armazenar o nome do jogador
-    if 'name' not in request.cookies:
+    # Fase 1: Perguntar o nome
+    if players[sender]['step'] == 'name':
         if incoming_msg:
+            players[sender]['name'] = incoming_msg  # Armazena o nome do jogador
+            players[sender]['step'] = 'raca'  # Muda para a fase de escolha de raça
             msg.body(f'Olá {incoming_msg}, bem-vindo ao RPG Corporativo! Agora, escolha sua raça:\n\n1. Executivo\n2. Analítico\n3. Técnico\n4. Comunicador\n5. Autodidata\n6. Persistente')
-            response.set_cookie('name', incoming_msg)
         else:
             msg.body('Por favor, me diga seu nome para começarmos o jogo!')
         return str(response)
-    
-    # Escolha da raça
-    if incoming_msg in ['1', '2', '3', '4', '5', '6']:
-        racas_nomes = ["Executivo", "Analítico", "Técnico", "Comunicador", "Autodidata", "Persistente"]
-        escolha_raca = racas_nomes[int(incoming_msg) - 1]
-        response.set_cookie('race', escolha_raca)
-        msg.body(f'Você escolheu a raça {escolha_raca}. Agora, escolha sua classe:\n\n1. Gerente de Vendas\n2. Analista de Mercado\n3. Assistente Administrativo\n4. Supervisor de Equipe\n5. Consultor de Vendas\n6. Coordenador de Projeto')
+
+    # Fase 2: Escolher a raça
+    if players[sender]['step'] == 'raca':
+        if incoming_msg in ['1', '2', '3', '4', '5', '6']:
+            racas_nomes = ["Executivo", "Analítico", "Técnico", "Comunicador", "Autodidata", "Persistente"]
+            escolha_raca = racas_nomes[int(incoming_msg) - 1]
+            players[sender]['raca'] = escolha_raca
+            players[sender]['step'] = 'classe'  # Muda para a fase de escolha de classe
+            msg.body(f'Você escolheu a raça {escolha_raca}. Agora, escolha sua classe:\n\n1. Gerente de Vendas\n2. Analista de Mercado\n3. Assistente Administrativo\n4. Supervisor de Equipe\n5. Consultor de Vendas\n6. Coordenador de Projeto')
+        else:
+            msg.body('Escolha inválida! Digite o número correspondente à raça.')
         return str(response)
 
-    # Escolha da classe
-    if incoming_msg in ['1', '2', '3', '4', '5', '6']:
-        classes_nomes = ["Gerente de Vendas", "Analista de Mercado", "Assistente Administrativo", "Supervisor de Equipe", "Consultor de Vendas", "Coordenador de Projeto"]
-        escolha_classe = classes_nomes[int(incoming_msg) - 1]
-        nome_jogador = request.cookies.get('name')
-        raca_jogador = request.cookies.get('race')
-        
-        # Atribuindo habilidades com base na escolha de raça e classe
-        raca_stats = racas.get(raca_jogador, {})
-        classe_stats = classes.get(escolha_classe, {})
-        
-        # Combinando as habilidades da raça e da classe
-        stats = {key: raca_stats.get(key, 0) + classe_stats.get(key, 0) for key in raca_stats}
-        
-        stats_msg = '\n'.join([f'{key}: {value}' for key, value in stats.items()])
-        msg.body(f'{nome_jogador}, sua combinação de {raca_jogador} e {escolha_classe} resultou nas seguintes habilidades:\n\n{stats_msg}')
+    # Fase 3: Escolher a classe
+    if players[sender]['step'] == 'classe':
+        if incoming_msg in ['1', '2', '3', '4', '5', '6']:
+            classes_nomes = ["Gerente de Vendas", "Analista de Mercado", "Assistente Administrativo", "Supervisor de Equipe", "Consultor de Vendas", "Coordenador de Projeto"]
+            escolha_classe = classes_nomes[int(incoming_msg) - 1]
+            players[sender]['classe'] = escolha_classe
+            
+            # Atribuindo habilidades com base na escolha de raça e classe
+            raca_jogador = players[sender]['raca']
+            classe_jogador = players[sender]['classe']
+            raca_stats = racas.get(raca_jogador, {})
+            classe_stats = classes.get(classe_jogador, {})
+            
+            # Combinando as habilidades da raça e da classe
+            stats = {key: raca_stats.get(key, 0) + classe_stats.get(key, 0) for key in raca_stats}
+            
+            stats_msg = '\n'.join([f'{key}: {value}' for key, value in stats.items()])
+            msg.body(f'{players[sender]["name"]}, sua combinação de {raca_jogador} e {classe_jogador} resultou nas seguintes habilidades:\n\n{stats_msg}')
+            players[sender]['step'] = 'end'  # Fim do processo
+        else:
+            msg.body('Escolha inválida! Digite o número correspondente à classe.')
         return str(response)
 
-    msg.body('Escolha inválida. Digite "start" para começar o jogo.')
+    msg.body('O jogo terminou. Se quiser jogar novamente, digite "start".')
     return str(response)
 
 if __name__ == '__main__':
